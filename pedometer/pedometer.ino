@@ -1,3 +1,4 @@
+#include <EEPROM.h>
 #include <Wire.h>
 #include <EngduinoLEDs.h>
 #include <EngduinoAccelerometer.h>
@@ -6,29 +7,42 @@
 
 typedef enum {WAIT_FOR_BTN_PRESS, WAIT_FOR_TIME_PULSE, LOGGING, UPLOADING} dev_state;
 
-// define this
+// define some key codes
 #define CR 13
 #define LF 10
 
 // constants
 const int _I_CONN_TIMEOUT = 5000;
-const float _F_THRESHOLD = 1.7;
+const float _F_ACCEL_THRESHOLD = 1.7;
 
+// flashes the LEDs i_flashes times in clr_flashcolor colour.
 void flashLEDs(colour clr_flashcolor, int i_flashes) {
-  for (int i = 0; i < i_flashes; i++) {
-    EngduinoLEDs.setAll(clr_flashcolor,3);
+  for (int i = 1; i < i_flashes; i++) {
+    EngduinoLEDs.setAll(clr_flashcolor, 3);
     delay(200);
-    EngduinoLEDs.setAll(0,0,0);
+    EngduinoLEDs.setAll(0, 0, 0);
     delay(200);
   }
+  EngduinoLEDs.setAll(clr_flashcolor, 3);
+  delay(200);
+  EngduinoLEDs.setAll(0, 0, 0);
+}
+
+// returns the magnitude of engduino's acceleration.
+float get_accel_mag() {
+  float f_accel[3];
+  EngduinoAccelerometer.xyz(f_accel);
+  return sqrt(f_accel[0] * f_accel[0] +
+              f_accel[1] * f_accel[1] +
+              f_accel[2] * f_accel[2]);
 }
 
 void setup() {
   EngduinoAccelerometer.begin();
-  
+
   EngduinoLEDs.begin();
-  EngduinoLEDs.setAll(6,2,0);
-  
+  EngduinoLEDs.setAll(6, 2, 0);
+
   EngduinoButton.begin();
 
   Serial.begin(9600);
@@ -36,19 +50,29 @@ void setup() {
 
 // persistent vars
 dev_state curr_dev_state  = WAIT_FOR_BTN_PRESS;
-long unsigned int i_connection_start_time   = 0; // 0 is a flag to say that we are not connecting to anything.
+
+// io vars
+unsigned long i_connection_start_time   = 0; // 0 is a flag to say that we are not connecting to anything.
 char s_buffer[16]; //enough for the 10 digit epoch plus a little more.
 byte i_buffer_length = 0;
+
+// eeprom
+int i_eeprom_ptr = 0; //points to first block of free space in EEPROM.
+
+// logging vars
+bool b_step_flag = false; // true when above threshold.
+float f_accel_mag = 0.0; //magnitude of the accel forces.
+bool b_step_up = false; //true only on odd activations (therefore step recorded only once)
 
 void loop() {
   // We are waiting for the user to press the button to sync the Engduino's timer.
   if (curr_dev_state == WAIT_FOR_BTN_PRESS) {
-    EngduinoLEDs.setAll(RED,3);
-    
+    EngduinoLEDs.setAll(RED, 3);
+
     if (EngduinoButton.wasPressed()) {
       // Send init signal to computer. We shall wait _CONN_TIMEOUT ms for the connection.
       Serial.write("pedometer_get_time\n");
-      EngduinoLEDs.setAll(6,2,0); // set LEDs to orange.
+      EngduinoLEDs.setAll(6, 2, 0); // set LEDs to orange.
       curr_dev_state = WAIT_FOR_TIME_PULSE;
       i_connection_start_time = millis();
     }
@@ -61,10 +85,19 @@ void loop() {
         //Grab data to buffer
         i_buffer_length = Serial.readBytesUntil(CR, s_buffer, 15);
         s_buffer[i_buffer_length] = '\0'; // null termination.
+
         if (isDigit(s_buffer[0])) {
-          i_connection_start_time = atoi(s_buffer); // we're using the i_connection_time variable to save space.
+          //i_connection_start_time = atoi(s_buffer); // we're using the i_connection_time variable to save space.
+
+          //EEPROM.put(i_eeprom_ptr,atol(s_buffer)); // put the start time into the eeprom.
+          i_eeprom_ptr += sizeof(long);
+
+          //log also the current offset from start of program in ms.
+          //EEPROM.put(i_eeprom_ptr,millis());
+          i_eeprom_ptr += sizeof(unsigned long);
+
           curr_dev_state = LOGGING;
-          flashLEDs(GREEN,2);          
+          flashLEDs(GREEN, 2);
         }
       }
     }
@@ -78,7 +111,21 @@ void loop() {
 
   // Logging
   if (curr_dev_state == LOGGING) {
-    EngduinoLEDs.setLED(0,GREEN,3);
-    
+    f_accel_mag = get_accel_mag();
+    EngduinoLEDs.setLED(0, GREEN, 3);
+
+    if (f_accel_mag > _F_ACCEL_THRESHOLD && !b_step_flag) {
+      flashLEDs(BLUE, 1);
+      b_step_up = !(b_step_up);
+      
+      // log the step here.
+      if (b_step_up)
+        //log_step();
+        
+      b_step_flag = true;
+    }
+    if (f_accel_mag < _F_ACCEL_THRESHOLD && b_step_flag) {
+      b_step_flag = false;
+    }
   }
 }
