@@ -8,6 +8,9 @@ import processing.serial.*;
 import java.io.*;
 import java.util.Scanner;
 
+final int _CHAR_LF = 10;
+final int _CHAR_CR = 13;
+
 // runs a command, returns first line of output.
 // Credit to http://stackoverflow.com/questions/792024/how-to-execute-system-commands-linux-bsd-using-java
 String execCommand(String strCommand) {    	
@@ -52,11 +55,12 @@ void setup() {
   // setup the port. later we will make this programmatic.
   String strPortName = Serial.list()[0];
   portArduino = new Serial(this, strPortName, 9600);
+  portArduino.bufferUntil('\n');
 
   appModeCurrent = EnumAppMode.IDLE;
 }
 
-void draw() {
+void serialEvent(Serial myPort) {
   appModeLast = appModeCurrent;
   background(255);
 
@@ -64,14 +68,17 @@ void draw() {
     appModeCurrent = EnumAppMode.IDLE;
   }
 
-  if (portArduino.available() > 0) {
-    strPortBuffer = portArduino.readStringUntil('\n').replace("\n","");
-    System.out.println("SERIAL GET: \""+strPortBuffer+"\"");
+  if (myPort.available() > 0) {
+    strPortBuffer = myPort.readStringUntil('\n');
+    System.out.println("SERIAL GET: '"+strPortBuffer+"'");
     if (strPortBuffer.equals("pedometer_get_time")) {
       appModeCurrent = EnumAppMode.SET_DEV_TIME;
       // return the current time as unix format (seconds since epoch)
       System.out.println("getting system time...");
-      portArduino.write(execCommand("date +%s"));
+      myPort.write(execCommand("date +%s"));
+    }
+    else if (strPortBuffer.equals("pedometer_got_time")) {
+      appModeCurrent = EnumAppMode.IDLE;
     }
   }
   
@@ -94,3 +101,5 @@ void draw() {
     intTimeSinceAppModeChange = 0;
   }
 }
+
+void draw() { }
