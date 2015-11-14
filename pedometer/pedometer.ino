@@ -132,12 +132,15 @@ void upload_read_line() {
 
 void upload_data() {
   unsigned int i_line_count = 0;
-  EngduinoLEDs.setAll(CYAN, 3);
-  delay(200);
+  EngduinoSD.open("data.dat",FILE_READ);
+  EngduinoLEDs.setAll(CYAN,3);
+  delay(800);
   while (EngduinoSD.available()) {
-    led_upload_pattern(i_line_count % 5);
-    upload_read_line();
-    i_line_count++;
+    //led_upload_pattern(i_line_count % 5);
+    //upload_read_line();
+    //i_line_count++;
+    Serial.write(EngduinoSD.read());
+    delay(2);
   }
 }
 
@@ -153,7 +156,7 @@ void setup() {
   // O_WRONLY = write mode
   // O_CREAT = create the file if it does not exist
   // O_TRUNC = overwrite any existing file.
-  EngduinoSD.begin("data.dat",FILE_WRITE);
+  EngduinoSD.begin();
   
 
   Serial.begin(9600);
@@ -222,8 +225,7 @@ void loop() {
         // close the file and reopen for reading.
         EngduinoSD.close();
         EngduinoLEDs.setAll(BLUE,3);
-        curr_dev_state = WAIT_FOR_BTN_SEND;
-        EngduinoSD.open("data.dat",FILE_READ);
+        curr_dev_state = WAIT_FOR_BTN_SEND;        
       }
     delay(10);
   }
@@ -264,6 +266,7 @@ void loop() {
     if (EngduinoButton.wasPressed()) {
       // Send init signal to computer. We shall wait _CONN_TIMEOUT ms for the connection.
       Serial.println("pedometer_get_time");
+      EngduinoSD.open("data.dat",FILE_WRITE);
       EngduinoLEDs.setAll(6, 2, 0); // set LEDs to orange.
       curr_dev_state = WAIT_FOR_TIME_PULSE;
       i_connection_start_time = millis();
