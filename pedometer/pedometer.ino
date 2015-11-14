@@ -3,7 +3,7 @@
 #include <EngduinoAccelerometer.h>
 #include <EngduinoButton.h>
 #include <EngduinoLEDs.h>
-#include <EngduinoSD.h>
+#include <SD.h>
 #include <stdlib.h>
 
 typedef enum {WAIT_FOR_BTN_INIT, WAIT_FOR_TIME_PULSE, LOGGING, WAIT_FOR_BTN_SEND, WAIT_FOR_UPLOAD, UPLOADING, WAIT_FOR_CONFIRM} dev_state;
@@ -85,7 +85,7 @@ bool upload_connect() {
   }
   if (Serial.available()) {
     i_buffer_length = Serial.readBytesUntil(CR, s_buffer, 15);
-    s_buffer[i_buffer_length] = '\0'; // null termination.
+    //s_buffer[i_buffer_length] = '\0'; // null termination.
     
     if (strcmp(s_buffer, "pedometer_ok") == 0)
       return true;
@@ -132,14 +132,18 @@ void upload_read_line() {
 
 void upload_data() {
   unsigned int i_line_count = 0;
+  char c_read_buffer = '\0';
   EngduinoSD.open("data.dat",FILE_READ);
   EngduinoLEDs.setAll(CYAN,3);
   delay(800);
   while (EngduinoSD.available()) {
-    //led_upload_pattern(i_line_count % 5);
+    led_upload_pattern(i_line_count % 5);
     //upload_read_line();
-    //i_line_count++;
-    Serial.write(EngduinoSD.read());
+//    i_line_count++;
+    c_read_buffer = EngduinoSD.read();
+    //if (c_read_buffer == LF)
+      //i_line_count++;
+    Serial.print(c_read_buffer);
     delay(2);
   }
 }
@@ -156,7 +160,9 @@ void setup() {
   // O_WRONLY = write mode
   // O_CREAT = create the file if it does not exist
   // O_TRUNC = overwrite any existing file.
-  EngduinoSD.begin();
+  
+  //EngduinoSD.begin();
+  SD.begin(8);
   
 
   Serial.begin(9600);
