@@ -43,7 +43,7 @@ PFont fontHelvetica;
 
 Serial portArduino;
 String strPortBuffer;
-String strStatus = "";
+String strStatus = "Nothing to do.";
 EnumAppMode appModeCurrent, appModeLast;
 int intTimeSinceAppModeChange = 0;
 
@@ -58,6 +58,7 @@ void setup() {
   portArduino.bufferUntil('\n');
 
   appModeCurrent = EnumAppMode.IDLE;
+  background(255);
 }
 
 void serialEvent(Serial myPort) {
@@ -69,24 +70,24 @@ void serialEvent(Serial myPort) {
   }
 
   if (myPort.available() > 0) {
-    strPortBuffer = myPort.readStringUntil('\n');
+    strPortBuffer = myPort.readStringUntil('\n').trim();
     System.out.println("SERIAL GET: '"+strPortBuffer+"'");
     if (strPortBuffer.equals("pedometer_get_time")) {
       appModeCurrent = EnumAppMode.SET_DEV_TIME;
       // return the current time as unix format (seconds since epoch)
       System.out.println("getting system time...");
       myPort.write(execCommand("date +%s"));
+      System.out.println("\""+execCommand("date +%s")+"\"");
     }
     else if (strPortBuffer.equals("pedometer_got_time")) {
       appModeCurrent = EnumAppMode.IDLE;
     }
+    else if (strPortBuffer.equals("pedometer_send_data")) {
+      myPort.write("pedometer_ok");
+      appModeCurrent = EnumAppMode.GET_DATA;
+    }
   }
   
-  // draw stuff.
-  textSize(16);
-
-  fill(0);
-  text(strStatus,20,20);
   switch(appModeCurrent) {
     case IDLE: strStatus = "Nothing to do."; break;
     case SET_DEV_TIME: strStatus = "Synchronising Engduino..."; break;
@@ -102,4 +103,10 @@ void serialEvent(Serial myPort) {
   }
 }
 
-void draw() { }
+void draw() { 
+  background(255);
+
+  textSize(16);
+  fill(0);
+  text(strStatus,20,20);
+}

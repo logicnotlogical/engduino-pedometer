@@ -6,15 +6,39 @@
 #include <EngduinoSD.h>
 #include <stdlib.h>
 
-typedef enum {WAIT_FOR_BTN_PRESS, WAIT_FOR_TIME_PULSE, LOGGING, UPLOADING} dev_state;
+typedef enum {WAIT_FOR_BTN_INIT, WAIT_FOR_TIME_PULSE, LOGGING, WAIT_FOR_BTN_SEND, WAIT_FOR_UPLOAD, UPLOADING, WAIT_FOR_CONFIRM} dev_state;
 
 // define some key codes
 #define CR 13
 #define LF 10
 
-// constants
+// CONSTANTS
 const int _I_CONN_TIMEOUT = 5000;
-const float _F_ACCEL_THRESHOLD = 2.0;
+const float _F_ACCEL_THRESHOLD = 2.2;
+
+
+// GLOBAL VARIABLES
+dev_state curr_dev_state = WAIT_FOR_BTN_INIT;
+
+// io vars
+unsigned int i_connection_start_time   = 0; // 0 is a flag to say that we are not connecting to anything.
+unsigned long i_dev_start_time = 0; //start time of logging according to millis()
+unsigned long i_real_start_time = 0; //start time of logging sequenc according to a real clock.
+char s_buffer[16]; //enough for the 10 digit epoch plus a little more.
+byte i_buffer_length = 0;
+
+// eeprom
+int i_eeprom_ptr = 0; //points to first block of free space in EEPROM.
+
+// logging vars
+bool b_step_flag = false; // true when above threshold.
+float f_accel_mag = 0.0; //ma1gnitude of the accel forces.
+float f_last_accel_mag = 0.0;
+bool b_step_up = false; //true only on odd activations (therefore step recorded only once)
+
+
+
+// FUNCTIONS
 
 // flashes the LEDs i_flashes times in clr_flashcolor colour.
 void flashLEDs(colour clr_flashcolor, int i_flashes) {
@@ -42,6 +66,81 @@ float get_accel_mag() {
     return f_a;
 }
 
+void log_data(float f_accel, unsigned long i_time) {
+  char s_buffer[16];
+  i_time -= i_dev_start_time;
+  sprintf(s_buffer, "%l", i_time);
+  EngduinoSD.write(s_buffer);
+  EngduinoSD.write(" ");
+  sprintf(s_buffer, "%f", floor((f_accel * 100) / 100));
+  EngduinoSD.writeln(s_buffer);
+}
+
+
+bool upload_connect() {
+  Serial.println("pedometer_send_data");
+  i_connection_start_time = millis();
+  while (!Serial.available() && ((millis() - i_connection_start_time) < _I_CONN_TIMEOUT)) {
+    delay(10);
+  }
+  if (Serial.available()) {
+    i_buffer_length = Serial.readBytesUntil(CR, s_buffer, 15);
+    s_buffer[i_buffer_length] = '\0'; // null termination.
+    
+    if (strcmp(s_buffer, "pedometer_ok") == 0)
+      return true;
+    else {
+      flashLEDs(RED, 2);
+      return false;
+    }
+  }
+  else
+    return false;
+}
+
+void led_upload_pattern(int i) {
+  // ARRAY LITERALS
+  colour arr_led_0[16] = {OFF,OFF,OFF,OFF,OFF,OFF,CYAN,CYAN,CYAN,CYAN,OFF,OFF,OFF,OFF,OFF,OFF};
+  colour arr_led_1[16] = {OFF,OFF,OFF,OFF,CYAN,CYAN,OFF,OFF,OFF,OFF,CYAN,OFF,OFF,OFF,OFF,OFF};
+  colour arr_led_2[16] = {OFF,OFF,OFF,CYAN,OFF,OFF,OFF,OFF,OFF,OFF,OFF,CYAN,OFF,OFF,OFF,OFF};
+  colour arr_led_3[16] = {OFF,CYAN,CYAN,OFF,OFF,OFF,OFF,OFF,OFF,OFF,OFF,OFF,CYAN,OFF,OFF,OFF};
+  colour arr_led_4[16] = {CYAN,OFF,OFF,OFF,OFF,OFF,OFF,OFF,OFF,OFF,OFF,OFF,OFF,CYAN,CYAN,CYAN};
+  
+  switch (i) {
+    case 0: EngduinoLEDs.setLEDs(arr_led_0);
+        break;
+    case 1: EngduinoLEDs.setLEDs(arr_led_1);
+        break;
+    case 2: EngduinoLEDs.setLEDs(arr_led_2);
+        break;
+    case 3: EngduinoLEDs.setLEDs(arr_led_3);
+        break;
+    case 4: EngduinoLEDs.setLEDs(arr_led_4);
+        break;
+  }
+}
+
+void upload_read_line() {
+  char s_read_buffer[256];
+  byte i_char_count = 0;
+  do {
+    s_read_buffer[i_char_count] = EngduinoSD.read();
+  } while (s_read_buffer[i_char_count++] != '\n');
+
+  Serial.println(s_read_buffer);  
+}
+
+void upload_data() {
+  unsigned int i_line_count = 0;
+  EngduinoLEDs.setAll(CYAN, 3);
+  delay(200);
+  while (EngduinoSD.available()) {
+    led_upload_pattern(i_line_count % 5);
+    upload_read_line();
+    i_line_count++;
+  }
+}
+
 void setup() {
   EngduinoAccelerometer.begin();
 
@@ -50,40 +149,85 @@ void setup() {
 
   EngduinoButton.begin();
 
-  EngduinoSD.begin();
+  // This opens the data file with the following params:
+  // O_WRONLY = write mode
+  // O_CREAT = create the file if it does not exist
+  // O_TRUNC = overwrite any existing file.
+  EngduinoSD.begin("data.dat",FILE_WRITE);
+  
 
   Serial.begin(9600);
 }
 
-// persistent vars
-dev_state curr_dev_state = WAIT_FOR_BTN_PRESS;
 
-// io vars
-unsigned long i_connection_start_time   = 0; // 0 is a flag to say that we are not connecting to anything.
-char s_buffer[16]; //enough for the 10 digit epoch plus a little more.
-byte i_buffer_length = 0;
 
-// eeprom
-int i_eeprom_ptr = 0; //points to first block of free space in EEPROM.
-
-// logging vars
-bool b_step_flag = false; // true when above threshold.
-float f_accel_mag = 0.0; //magnitude of the accel forces.
-bool b_step_up = false; //true only on odd activations (therefore step recorded only once)
 
 void loop() {
-  // We are waiting for the user to press the button to sync the Engduino's timer.
-  if (curr_dev_state == WAIT_FOR_BTN_PRESS) {
-    EngduinoLEDs.setAll(RED, 3);
 
+  // IF CLAUSES IN REVERSE CHRONILOGICAL ORDER
+
+
+  if (curr_dev_state == UPLOADING) {
+    upload_data();
+    curr_dev_state = WAIT_FOR_BTN_INIT;
+  }
+
+
+  // WAITING FOR COMPUTER TO REPLY
+  if(curr_dev_state == WAIT_FOR_UPLOAD) {
+    EngduinoLEDs.setAll(4,0,4);
+    if (upload_connect())
+      curr_dev_state = UPLOADING;
+    else
+      curr_dev_state = WAIT_FOR_BTN_SEND;
+  }
+
+
+  // WAITING FOR USER TO INSTANTIATE UPLOAD
+  if (curr_dev_state == WAIT_FOR_BTN_SEND) {
+    EngduinoLEDs.setAll(BLUE,3);
     if (EngduinoButton.wasPressed()) {
-      // Send init signal to computer. We shall wait _CONN_TIMEOUT ms for the connection.
-      Serial.println("pedometer_get_time");
-      EngduinoLEDs.setAll(6, 2, 0); // set LEDs to orange.
-      curr_dev_state = WAIT_FOR_TIME_PULSE;
-      i_connection_start_time = millis();
+      curr_dev_state = WAIT_FOR_UPLOAD;
+      EngduinoLEDs.setAll(4,0,4);
     }
   }
+
+
+  // LOGGING DATA
+  if (curr_dev_state == LOGGING) {
+    f_last_accel_mag = f_accel_mag;
+    f_accel_mag = get_accel_mag();
+    EngduinoLEDs.setLED(0, GREEN, 3);
+//    Serial.println(f_accel_mag);  
+    log_data(f_accel_mag,millis());
+    
+//    if (f_accel_mag != NULL && f_accel_mag > _F_ACCEL_THRESHOLD && !b_step_flag) {      
+////        Serial.print("Accel: ");
+////        Serial.println(f_accel_mag);  
+//      
+//      // log the step here.
+//      if (f_accel_mag > f_last_accel_mag && b_step_up) {
+//        //log_step();
+//        //Serial.println("step");
+//        b_step_flag = true;
+//      }
+//      b_step_up = !(b_step_up);
+//      //Serial.println(b_step_up);
+//    }
+//    if (f_accel_mag < _F_ACCEL_THRESHOLD && b_step_flag) {
+//      b_step_flag = false;
+//    }
+
+      if (EngduinoButton.wasPressed()) {
+        // close the file and reopen for reading.
+        EngduinoSD.close();
+        EngduinoLEDs.setAll(BLUE,3);
+        curr_dev_state = WAIT_FOR_BTN_SEND;
+        EngduinoSD.open("data.dat",FILE_READ);
+      }
+    delay(10);
+  }
+
 
   // Waiting on the time pulse from the system, epoch format.
   else if (curr_dev_state == WAIT_FOR_TIME_PULSE) {
@@ -94,48 +238,35 @@ void loop() {
         s_buffer[i_buffer_length] = '\0'; // null termination.
 
         if (isDigit(s_buffer[0])) {
-          //i_connection_start_time = atoi(s_buffer); // we're using the i_connection_time variable to save space.
-
-          //EEPROM.put(i_eeprom_ptr,atol(s_buffer)); // put the start time into the eeprom.
-          i_eeprom_ptr += sizeof(long);
-
-          //log also the current offset from start of program in ms.
-          //EEPROM.put(i_eeprom_ptr,millis());
-          i_eeprom_ptr += sizeof(unsigned long);
+          i_dev_start_time = millis();
+          EngduinoSD.write("real_start_time: ");
+          EngduinoSD.writeln(s_buffer);
 
           curr_dev_state = LOGGING;
           flashLEDs(GREEN, 2);
-          Serial.write("pedometer_got_time\n");
+          Serial.println("pedometer_got_time");
         }
       }
     }
 
     else { //out of time.
-      curr_dev_state = WAIT_FOR_BTN_PRESS;
+      curr_dev_state = WAIT_FOR_BTN_INIT;
       // flush the input buffer.
       s_buffer; i_buffer_length = 0;
     }
   }
 
-  // Logging
-  if (curr_dev_state == LOGGING) {
-    f_accel_mag = get_accel_mag();
-    EngduinoLEDs.setLED(0, GREEN, 3);
     
-    if (f_accel_mag != NULL && f_accel_mag > _F_ACCEL_THRESHOLD && !b_step_flag) {
-      flashLEDs(BLUE, 1);
-        Serial.print("Accel: ");
-        Serial.println(f_accel_mag);
-      b_step_up = !(b_step_up);
-      
-      // log the step here.
-      if (b_step_up) {
-        //log_step();
-        b_step_flag = true;
-      }
-    }
-    if (f_accel_mag < _F_ACCEL_THRESHOLD && b_step_flag) {
-      b_step_flag = false;
+  // We are waiting for the user to press the button to sync the Engduino's timer.
+  if (curr_dev_state == WAIT_FOR_BTN_INIT) {
+    EngduinoLEDs.setAll(RED, 3);
+
+    if (EngduinoButton.wasPressed()) {
+      // Send init signal to computer. We shall wait _CONN_TIMEOUT ms for the connection.
+      Serial.println("pedometer_get_time");
+      EngduinoLEDs.setAll(6, 2, 0); // set LEDs to orange.
+      curr_dev_state = WAIT_FOR_TIME_PULSE;
+      i_connection_start_time = millis();
     }
   }
 }
