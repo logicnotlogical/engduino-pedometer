@@ -152,17 +152,19 @@ void upload_data() {
   EngduinoSD.open("data.dat", FILE_READ);
   EngduinoLEDs.setAll(CYAN,3);
   delay(800);
-  while (file_log.available()) {
-    led_upload_pattern(i_line_count % 5);
-    //upload_read_line();
-//    i_line_count++;
+  while (EngduinoSD.available()) {
     c_read_buffer = EngduinoSD.read();
-    if (c_read_buffer == LF)
-      i_line_count++;
-    Serial.print(c_read_buffer);
-    delay(2);
+    if (c_read_buffer != 0) {
+      led_upload_pattern(i_line_count % 5);
+      if (c_read_buffer == LF)
+        i_line_count++;
+      Serial.print(c_read_buffer);
+      delay(10);
+    }
+    else return;
   }
-  file_log.close();
+  //Serial.println("pedometer_data_eof");
+  //EngduinoSD.close();
 }
 
 void setup() {
