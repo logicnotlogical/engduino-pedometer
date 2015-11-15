@@ -83,12 +83,11 @@ float get_accel_mag() {
 }
 
 void log_data(float f_accel, unsigned long i_time) {
-  char s_buffer[30];
+  String s_buffer;
   i_time -= i_dev_start_time;
-  sprintf(s_buffer, "%l", i_time);
-  EngduinoSD.write(s_buffer);
-  EngduinoSD.write(" ");
-  sprintf(s_buffer, "%f", floor((f_accel * 100) / 100));
+  s_buffer += i_time;
+  s_buffer += " ";
+  s_buffer += (floor(f_accel * 100) / 100);
   EngduinoSD.writeln(s_buffer);
 }
 
@@ -136,19 +135,9 @@ void led_upload_pattern(int i) {
   }
 }
 
-void upload_read_line() {
-  char s_read_buffer[256];
-  byte i_char_count = 0;
-  do {
-    s_read_buffer[i_char_count] = file_log.read();
-  } while (s_read_buffer[i_char_count++] != '\n');
-
-  Serial.println(s_read_buffer);  
-}
-
 void upload_data() {
   unsigned int i_line_count = 0;
-  char c_read_buffer = '\0';
+  char c_read_buffer;
   EngduinoSD.open("data.dat", FILE_READ);
   EngduinoLEDs.setAll(CYAN,3);
   delay(800);
@@ -163,9 +152,10 @@ void upload_data() {
     }
     else return;
   }
-  //Serial.println("pedometer_data_eof");
-  //EngduinoSD.close();
+  Serial.println("pedometer_data_eof");
+  EngduinoSD.close();
 }
+
 
 void setup() {
   EngduinoAccelerometer.begin();
@@ -182,7 +172,7 @@ void setup() {
   
   // Setup SD  
   EngduinoSD.begin();
-  sd_remove_file("data.dat");
+  
  
 
   Serial.begin(9600);
@@ -197,6 +187,7 @@ void loop() {
 
 
   if (curr_dev_state == UPLOADING) {
+    EngduinoLEDs.setAll(CYAN);
     upload_data();
     curr_dev_state = WAIT_FOR_BTN_INIT;
   }
@@ -248,7 +239,6 @@ void loop() {
 
       if (EngduinoButton.wasPressed()) {
         // close the file and reopen for reading.
-//        EngduinoSD.close();
         EngduinoSD.close();
         
         EngduinoLEDs.setAll(BLUE,3);
@@ -268,6 +258,8 @@ void loop() {
 
         if (isDigit(s_buffer[0])) {
           i_dev_start_time = millis();
+          sd_remove_file("data.dat");
+          delay(50);
           EngduinoSD.open("data.dat", FILE_WRITE);
           EngduinoSD.write("real_start_time: ");
           EngduinoSD.writeln(s_buffer);
