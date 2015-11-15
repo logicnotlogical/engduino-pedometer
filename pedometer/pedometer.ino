@@ -83,12 +83,14 @@ float get_accel_mag() {
 }
 
 void log_data(float f_accel, unsigned long i_time) {
-  String s_buffer;
-  i_time -= i_dev_start_time;
-  s_buffer += i_time;
-  s_buffer += " ";
-  s_buffer += (floor(f_accel * 100) / 100);
-  EngduinoSD.writeln(s_buffer);
+  if (f_accel != NULL) {
+    String s_buffer;
+    i_time -= i_dev_start_time;
+    s_buffer += i_time;
+    s_buffer += " ";
+    s_buffer += (floor(f_accel * 100) / 100);
+    EngduinoSD.writeln(s_buffer);
+  }
 }
 
 
@@ -100,7 +102,6 @@ bool upload_connect() {
   }
   if (Serial.available()) {
     i_buffer_length = Serial.readBytesUntil(CR, s_buffer, 15);
-    //s_buffer[i_buffer_length] = '\0'; // null termination.
     
     if (strcmp(s_buffer, "pedometer_ok") == 0)
       return true;
@@ -139,18 +140,14 @@ void upload_data() {
   unsigned int i_line_count = 0;
   char c_read_buffer;
   EngduinoSD.open("data.dat", FILE_READ);
-  EngduinoLEDs.setAll(CYAN,3);
   delay(800);
-  while (EngduinoSD.available()) {
+  while (EngduinoSD.available()) {    
     c_read_buffer = EngduinoSD.read();
-    if (c_read_buffer != 0) {
-      led_upload_pattern(i_line_count % 5);
-      if (c_read_buffer == LF)
-        i_line_count++;
+      //led_upload_pattern(i_line_count % 5);
+      //if (c_read_buffer == LF)
+        //i_line_count++;
       Serial.print(c_read_buffer);
       delay(10);
-    }
-    else return;
   }
   Serial.println("pedometer_data_eof");
   EngduinoSD.close();
