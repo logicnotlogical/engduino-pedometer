@@ -6,7 +6,7 @@
 #include <EngduinoSD.h>
 #include <stdlib.h>
 
-typedef enum {WAIT_FOR_BTN_INIT, WAIT_FOR_TIME_PULSE, LOGGING, WAIT_FOR_BTN_SEND, WAIT_FOR_UPLOAD, UPLOADING, WAIT_FOR_CONFIRM} dev_state;
+typedef enum {WAIT_FOR_BTN_INIT, WAIT_FOR_TIME_PULSE, LOGGING} dev_state;
 
 // define some key codes
 #define CR 13
@@ -14,7 +14,6 @@ typedef enum {WAIT_FOR_BTN_INIT, WAIT_FOR_TIME_PULSE, LOGGING, WAIT_FOR_BTN_SEND
 
 // CONSTANTS
 const int _I_CONN_TIMEOUT = 5000;
-const float _F_ACCEL_THRESHOLD = 2.2;
 
 
 // GLOBAL VARIABLES
@@ -194,33 +193,6 @@ void setup() {
 void loop() {
 
   // IF CLAUSES IN REVERSE CHRONILOGICAL ORDER
-
-
-  if (curr_dev_state == UPLOADING) {
-    EngduinoLEDs.setAll(CYAN,3);
-    upload_data();
-    curr_dev_state = WAIT_FOR_BTN_INIT;
-  }
-
-
-  // WAITING FOR COMPUTER TO REPLY
-  if(curr_dev_state == WAIT_FOR_UPLOAD) {
-    EngduinoLEDs.setAll(4,0,4);
-    if (upload_connect())
-      curr_dev_state = UPLOADING;
-    else
-      curr_dev_state = WAIT_FOR_BTN_SEND;
-  }
-
-
-  // WAITING FOR USER TO INSTANTIATE UPLOAD
-  if (curr_dev_state == WAIT_FOR_BTN_SEND) {
-    EngduinoLEDs.setAll(BLUE,3);
-    if (EngduinoButton.wasPressed()) {
-      curr_dev_state = WAIT_FOR_UPLOAD;
-      EngduinoLEDs.setAll(4,0,4);
-    }
-  }
 
 
   // LOGGING DATA

@@ -114,6 +114,7 @@ void serialEvent(Serial myPort) {
       }
       appModeCurrent = EnumAppMode.PLOT_DATA;
     }
+    // else it's probably a value being sent.
     else {
       try {
         try {
