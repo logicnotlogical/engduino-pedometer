@@ -17,11 +17,13 @@ final int _COLOR_TEXT = 0xFF222222;
 final int _COLOR_FOREGROUND = 0xFF008CBA;
 
 // runs a command, returns first line of output.
-// Credit to http://stackoverflow.com/questions/792024/how-to-execute-system-commands-linux-bsd-using-java
+// Credit to http://stackoverflow.com/questions/792024/how-to-execute-system-commands-linux-bsd-using-java for inspiration in using the Process class.
 String execCommand(String strCommand) {    	
 	try {
-		Process p = Runtime.getRuntime().exec(strCommand);//Windows command, use "ls -oa" for UNIX
-		Scanner sc = new Scanner(p.getInputStream());    		
+    // create a process in which we run the command.
+		Process p = Runtime.getRuntime().exec(strCommand);
+		Scanner sc = new Scanner(p.getInputStream());
+    // Read the output.    
 		if (sc.hasNext())
       return sc.nextLine();
     else
@@ -87,6 +89,9 @@ void setup() {
   background(_COLOR_BACKGROUND);
 }
 
+/* 
+ * Activates whenever there is serial data.
+ */
 void serialEvent(Serial myPort) {
   background(_COLOR_BACKGROUND);
 
@@ -152,7 +157,8 @@ void serialEvent(Serial myPort) {
 
 }
 
-
+/* This function draws the graph to the screen.
+ */
 void plotGraph() throws IOException {
   
   // open a bufferedreader to read the file.
