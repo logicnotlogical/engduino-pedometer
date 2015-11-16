@@ -28,8 +28,7 @@ char s_buffer[16]; //enough for the 10 digit epoch plus a little more.
 byte i_buffer_length = 0;
 
 // Data
-File file_log;
-volatile unsigned char regTmp;
+volatile unsigned char regTmp; //temp register value storage.
 
 // logging vars
 bool b_step_flag = false; // true when above threshold.
@@ -83,7 +82,7 @@ float get_accel_mag() {
 }
 
 void log_data(float f_accel, unsigned long i_time) {
-  if (f_accel != NULL) {
+  if (f_accel != NULL && f_accel > 0) {
     String s_buffer;
     i_time -= i_dev_start_time;
     s_buffer += i_time;
@@ -241,7 +240,7 @@ void loop() {
         EngduinoLEDs.setAll(BLUE,3);
         curr_dev_state = WAIT_FOR_BTN_SEND;        
       }
-    delay(10);
+    delay(20);
   }
 
 
