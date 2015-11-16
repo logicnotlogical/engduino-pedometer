@@ -17,7 +17,11 @@ TEXT_FONT = "Lato";
 TEXT_SIZE = 7;
 
 module base(length = BASE_LENGTH, width = BASE_WIDTH, height = BASE_HEIGHT) {
-    cube (size = [length, width, height]);
+    difference() {
+        cube (size = [length, width, height]);
+        translate([width / 4,width * 1 / 8,0])
+            cube (size = [length, width * 0.75, height]);
+    }
 }
 
 // The dummy element removes any extruding parts from the bottom.
@@ -68,7 +72,7 @@ module stand(incline = STAND_INCLINE, width = BASE_WIDTH, height = STAND_HEIGHT,
 
 
 // Call the components.
-base();
+    base();
 translate(v = [BASE_LENGTH, 0, BASE_HEIGHT]){
         stand();
 }

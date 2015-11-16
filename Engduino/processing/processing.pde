@@ -210,7 +210,6 @@ void plotGraph() throws IOException {
     endShape();
     intLastTime = intTime;
     floatLastAccel = floatAccel;
-    intDataIndex++;
 
     //step stuff.
     if (!(bStepActive) && (floatAccel > floatStepThreshold)) {
@@ -235,7 +234,7 @@ void plotGraph() throws IOException {
   text("Min: 0", 10, height -20);
 
   text("Max: " + Integer.toString(intTimeMax),width-100, height -20);
-  text("Time (s)", width - 60, height);
+  text("Time (ms)", width - 60, height);
 
   text("Steps: " + Integer.toString(intSteps),width / 2 - 10, height - 20);
 
