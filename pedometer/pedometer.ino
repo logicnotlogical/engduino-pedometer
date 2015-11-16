@@ -88,7 +88,7 @@ void log_data(float f_accel, unsigned long i_time) {
     s_buffer += i_time;
     s_buffer += " ";
     s_buffer += (floor(f_accel * 100) / 100);
-    EngduinoSD.writeln(s_buffer);
+    Serial.println(s_buffer);
   }
 }
 
@@ -135,20 +135,34 @@ void led_upload_pattern(int i) {
   }
 }
 
+//void upload_data() {
+//  unsigned int i_line_count = 0;
+//  char c_read_buffer;
+//  EngduinoSD.open("data.dat", FILE_READ);
+//  delay(800);
+//  while (EngduinoSD.available()) {    
+//    c_read_buffer = EngduinoSD.read();
+//      //led_upload_pattern(i_line_count % 5);
+//      //if (c_read_buffer == LF)
+//        //i_line_count++;
+//      Serial.print(c_read_buffer);
+//      delay(10);
+//  }
+//  Serial.println("pedometer_data_eof");
+//  EngduinoSD.close();
+//}
+
+
 void upload_data() {
-  unsigned int i_line_count = 0;
-  char c_read_buffer;
-  EngduinoSD.open("data.dat", FILE_READ);
-  delay(800);
-  while (EngduinoSD.available()) {    
-    c_read_buffer = EngduinoSD.read();
-      //led_upload_pattern(i_line_count % 5);
-      //if (c_read_buffer == LF)
-        //i_line_count++;
-      Serial.print(c_read_buffer);
-      delay(10);
+  if (EngduinoSD.open("DATA.DAT", FILE_READ)) {
+    Serial.println("pedometer_begin");
+    while (EngduinoSD.available()) {
+      Serial.write(EngduinoSD.read());
+      delay(2);
+    }
   }
-  Serial.println("pedometer_data_eof");
+  else return;
+  Serial.println("pedometer_end");
   EngduinoSD.close();
 }
 
@@ -183,7 +197,7 @@ void loop() {
 
 
   if (curr_dev_state == UPLOADING) {
-    EngduinoLEDs.setAll(CYAN);
+    EngduinoLEDs.setAll(CYAN,3);
     upload_data();
     curr_dev_state = WAIT_FOR_BTN_INIT;
   }
@@ -235,10 +249,11 @@ void loop() {
 
       if (EngduinoButton.wasPressed()) {
         // close the file and reopen for reading.
+        Serial.println("pedometer_end");
         EngduinoSD.close();
         
         EngduinoLEDs.setAll(BLUE,3);
-        curr_dev_state = WAIT_FOR_BTN_SEND;        
+        curr_dev_state = WAIT_FOR_BTN_INIT;        
       }
     delay(20);
   }
@@ -254,9 +269,9 @@ void loop() {
 
         if (isDigit(s_buffer[0])) {
           i_dev_start_time = millis();
-          sd_remove_file("data.dat");
+          sd_remove_file("DATA.DAT");
           delay(50);
-          EngduinoSD.open("data.dat", FILE_WRITE);
+          EngduinoSD.open("DATA.DAT", FILE_WRITE);
           EngduinoSD.write("real_start_time: ");
           EngduinoSD.writeln(s_buffer);
 //          EngduinoSD.write("real_start_time: ");
